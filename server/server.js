@@ -1,18 +1,18 @@
-import express from "express";
-import bodyParser from "body-parser";
-import cors from "cors";
-import mongoose from "mongoose";
+import express from 'express';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import mongoose from 'mongoose';
 
-import booksData from "./data/books.json";
+import booksData from './data/books.json';
 
-const ERR_CANNOT_FIND_ISBN = "Cannot find book";
+const ERR_CANNOT_FIND_ISBN = 'Cannot find book';
 
 const mongoUrl =
-  process.env.MONGO_URL || "mongodb://localhost/WK19PostRequests";
+  process.env.MONGO_URL || 'mongodb://localhost/WK19PostRequests';
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
 
-const Book = mongoose.model("Book", {
+const Book = mongoose.model('Book', {
   bookID: {
     type: Number,
   },
@@ -50,12 +50,13 @@ const Book = mongoose.model("Book", {
   },
 });
 
-const Review = mongoose.model("Review", {
+const Review = mongoose.model('Review', {
   review: {
     type: String,
   },
   book: {
-    type: { type: mongoose.Schema.Types.ObjectId, ref: "Book" },
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Book',
   },
   likes: {
     type: Number,
@@ -63,10 +64,12 @@ const Review = mongoose.model("Review", {
   },
 });
 
+// Create the review model
+
 if (process.env.RESET_DATABASE) {
   const seedDatabase = async () => {
     await Book.deleteMany();
-    await Review.deleteMany();
+    // Review.deleteMany()
 
     await booksData.forEach((book) => {
       new Book(book).save();
@@ -82,44 +85,52 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-app.post("/books/:isbn/review", async (req, res) => {
-  const { isbn } = req.params;
-  const review = req.body;
+// Endpoints
 
-  console.log(`POST /books/${isbn}/review`);
-  await Book.updateOne({ isbn: isbn }, { $inc: { text_reviews_count: 1 } });
-  await new Review({ review: review.review, book: review.book }).save();
-  // await new Review(review).save();
-  res.status(201).json();
+// GET retrieves all unread books
+app.get('/books/unread', async (req, res) => {
+  console.log('GET /books/unread');
+
+  const unreadBooks = await Book.find({ read: false })
+    .sort({ num_pages: -1 })
+    .limit(20);
+
+  res.status(200).json(unreadBooks);
 });
 
-app.put("/books/:isbn/read", async (req, res) => {
+// GET get book by isbn
+app.get('/books/:isbn', async (req, res) => {
+  const { isbn } = req.params;
+  console.log(`GET /books/${isbn}`);
+  console.log(`ISBN: ${isbn}`);
+  const book = await Book.findOne({ isbn });
+  if (book) {
+    res.status(200).json(book);
+  } else {
+    res.status(404).json({ message: ERR_CANNOT_FIND_ISBN });
+  }
+});
+
+// PUT marks a book as read
+app.put('/books/:isbn/read', async (req, res) => {
   const { isbn } = req.params;
   console.log(`PUT /books/${isbn}/read`);
   await Book.updateOne({ isbn: isbn }, { read: true });
   res.status(201).json();
 });
 
-app.get("/books/unread", async (req, res) => {
-  console.log("GET /books/unread");
+// POST posts a review for a certain book
+app.post('/books/:isbn/review', async (req, res) => {
+  const { isbn } = req.params;
+  // "{ review: 'Great', book: '5ec237b2fb7dbe3b80ad04dc', likes: 1000 }"
+  const { review, book } = req.body; // JSON data
 
-  const unreadBooks = await Book.find({ read: false })
-    .sort({ num_pages: -1 })
-    .limit(20);
+  console.log(`POST /books/${isbn}/review`);
+  await Book.updateOne({ isbn: isbn }, { $inc: { text_reviews_count: 1 } });
+  await new Review({ review, book }).save();
+  // await new Review(review).save();
 
-  // Should there be an error here?
-  res.status(200).json(unreadBooks);
-});
-
-app.get("/books/:isbn", async (req, res) => {
-  const isbn = req.params.isbn;
-  console.log(`GET /books/${isbn}`);
-  const book = await Book.findOne({ isbn: isbn });
-  if (book) {
-    res.status(200).json(results);
-  } else {
-    res.status(404).json({ message: ERR_CANNOT_FIND_ISBN, err: err });
-  }
+  res.status(201).json();
 });
 
 // Start the server
