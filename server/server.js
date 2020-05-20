@@ -1,25 +1,25 @@
-import express from "express";
-import bodyParser from "body-parser";
-import cors from "cors";
-import mongoose from "mongoose";
+import express from 'express';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import mongoose from 'mongoose';
 
-import booksData from "./data/books.json";
+import booksData from './data/books.json';
 
-const ERR_CANNOT_FIND_ISBN = "Cannot find book";
+const ERR_CANNOT_FIND_ISBN = 'Cannot find book';
 
 const mongoUrl =
-  process.env.MONGO_URL || "mongodb://localhost/WK19PostRequests";
+  process.env.MONGO_URL || 'mongodb://localhost/WK19PostRequests';
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
 
 // Today's agenda
-// - Endpoint order
-// - Increments, operators
-// - Multiple query parameters for sort *
 // - Models vs. Schemas *
-// - Deploy current project
+// - Multiple query parameters for sort *
+// - Increments, operators *
+// - Endpoint order *
+// - Deploy current project *
 
-const Book = mongoose.model("Book", {
+const Book = mongoose.model('Book', {
   bookID: {
     type: Number,
   },
@@ -57,20 +57,23 @@ const Book = mongoose.model("Book", {
   },
 });
 
+// Schema
 const reviewSchema = {
   review: {
     type: String,
   },
   book: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Book",
+    ref: 'Book',
   },
   likes: {
     type: Number,
     default: 0,
   },
 };
-const Review = mongoose.model("Review", reviewSchema);
+
+// Model
+const Review = mongoose.model('Review', reviewSchema);
 
 // Create the review model
 
@@ -93,46 +96,47 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-app.get("/books", async (req, res) => {
+app.get('/books', async (req, res) => {
   const sortField = req.query.sortField;
-  const sortOrder = req.query.sortOrder || "asc";
+  const sortOrder = req.query.sortOrder || 'asc'; // Expected asc/desc
   const limit = req.query.limit;
 
-  console.log(
-    `GET /books?sortField=${sortField}&sortOrder=${sortOrder}&limit=${limit}`
-  );
+  console.log(`GET /books?sortField=${sortField}&sortOrder=${sortOrder}`);
 
-  // Create the initial query
-  let query = Book.find();
+  // Created the initial database query
+  let databaseQuery = Book.find();
 
   if (sortField) {
-    query = query.sort({ [sortField]: sortOrder === "asc" ? 1 : -1 });
+    databaseQuery = databaseQuery.sort({
+      [sortField]: sortOrder === 'asc' ? 1 : -1,
+    });
   }
 
   if (limit) {
-    query = query.limit(+limit);
+    databaseQuery = databaseQuery.limit(+limit);
   }
 
-  // Actually executes the sort
-  const results = await query;
-
+  // ACTUALLY EXECUTE the database query
+  const results = await databaseQuery;
   res.status(200).json(results);
 });
 
-app.put("/books/:isbn", async (req, res) => {
+app.put('/books/:isbn', async (req, res) => {
+  // Get query parameters to modify a specific field to a specified val
   const { isbn } = req.params;
   const field = req.query.field;
   const value = req.query.value;
 
-  console.log(`PUT /books/${isbn}/review?field=${field}&value=${value}`);
+  console.log(`PUT /books/${isbn}?field=${field}&value=${value}`);
+
   const updatedBook = await Book.updateOne(
-    { isbn: isbn },
-    { $set: { [field]: value } }
+    { isbn: isbn }, // Search
+    { $set: { [field]: value } } // Update
   );
   res.status(201).json(updatedBook);
 });
 
-app.post("/books/:isbn/review", async (req, res) => {
+app.post('/books/:isbn/review', async (req, res) => {
   const { isbn } = req.params;
   const review = req.body;
 
@@ -143,8 +147,15 @@ app.post("/books/:isbn/review", async (req, res) => {
   res.status(201).json();
 });
 
-app.get("/books/unread", async (req, res) => {
-  console.log("GET /books/unread");
+app.put('/books/:isbn/read', async (req, res) => {
+  const { isbn } = req.params;
+  console.log(`PUT /books/${isbn}/read`);
+  await Book.updateOne({ isbn: isbn }, { read: true });
+  res.status(201).json();
+});
+
+app.get('/books/unread', async (req, res) => {
+  console.log('GET /books/unread');
 
   const unreadBooks = await Book.find({ read: false })
     .sort({ num_pages: -1 })
@@ -153,14 +164,7 @@ app.get("/books/unread", async (req, res) => {
   res.status(200).json(unreadBooks);
 });
 
-app.put("/books/:isbn/read", async (req, res) => {
-  const { isbn } = req.params;
-  console.log(`PUT /books/${isbn}/read`);
-  await Book.updateOne({ isbn: isbn }, { read: true });
-  res.status(201).json();
-});
-
-app.get("/books/:isbn", async (req, res) => {
+app.get('/books/:isbn', async (req, res) => {
   const isbn = req.params.isbn;
   console.log(`GET /books/${isbn}`);
   console.log(`ISBN: ${isbn}`);
@@ -173,7 +177,7 @@ app.get("/books/:isbn", async (req, res) => {
 });
 
 // PUT marks a book as read
-app.put("/books/:isbn/read", async (req, res) => {
+app.put('/books/:isbn/read', async (req, res) => {
   const { isbn } = req.params;
   console.log(`PUT /books/${isbn}/read`);
   await Book.updateOne({ isbn: isbn }, { read: true });
@@ -181,7 +185,7 @@ app.put("/books/:isbn/read", async (req, res) => {
 });
 
 // POST posts a review for a certain book
-app.post("/books/:isbn/review", async (req, res) => {
+app.post('/books/:isbn/review', async (req, res) => {
   const { isbn } = req.params;
   // "{ review: 'Great', book: '5ec237b2fb7dbe3b80ad04dc', likes: 1000 }"
   const { review, book } = req.body; // JSON data
